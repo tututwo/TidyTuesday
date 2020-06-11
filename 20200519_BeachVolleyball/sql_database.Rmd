@@ -1,0 +1,62 @@
+---
+title: "SQlite_database"
+author: "Tu"
+date: "6/9/2020"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+
+theme_set(theme_minimal())
+```
+
+```{r include=FALSE}
+vb_matches <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-19/vb_matches.csv', guess_max = 76000)
+```
+
+
+# Create database
+```{r}
+library(RSQLite)
+```
+```{r}
+conn <- dbConnect(RSQLite::SQLite(), "Volleyball.db")
+```
+
+# Create a table inside the database
+```{r}
+dbWriteTable(conn, "vb_matches", vb_matches)
+
+dbListTables(conn)
+```
+
+```{r}
+dbReadTable(conn, 'vb_matches')
+```
+
+# Try circuit==AVP
+
+```{r}
+vb_AVP <- dbSendQuery(conn, 
+                            'SELECT *
+                            FROM vb_matches
+                            WHERE circuit = "AVP"'
+                            )
+dbFetch(vb_AVP)
+```
+
+
+```{r}
+dbDisconnect(conn)
+```
+
+
+
+
