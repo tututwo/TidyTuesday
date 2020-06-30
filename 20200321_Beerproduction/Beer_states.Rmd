@@ -1,0 +1,82 @@
+---
+title: "Untitled"
+author: "Tu"
+date: "6/22/2020"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(bbplot)
+library(lubridate)
+theme_set(theme_minimal())
+```
+
+```{r}
+beer_states <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-31/beer_states.csv') %>%
+  na.omit()
+```
+```{r}
+write.csv(beer_states,".\\beer_states.csv", row.names = FALSE)
+```
+
+```{r}
+skimr::skim(beer_states)
+```
+
+```{r}
+head(beer_states)
+```
+
+## What is the most common/produced type throughout the years?
+```{r}
+beer_states %>%
+  count(type)
+```
+ 
+```{r}
+beer_states %>%
+  group_by(type) %>%
+  tally(barrels)
+```
+ 
+ ## Where is this difference from? Which state produces the most of bottles of cans?
+ ## Which year is the boost?
+ 
+```{r fig.height=22, fig.width=11}
+beer_states %>%
+  filter(!str_detect(state, "total")) %>%
+  group_by(state,type) %>%
+  tally(barrels) %>%
+  arrange(desc(n)) %>%
+  ggplot() +
+  geom_col(aes(x = n, y = reorder(state,n), fill = type))
+```
+ 
+ 
+
+```{r fig.height=22, fig.width=11}
+beer_states %>%
+  filter(state == "ND") %>%
+    group_by(type) %>%
+    tally(barrels) 
+```
+
+## I wonder what happen to those low production states?(SD,ND,WV) geographical reasons? climate? but people in Dokoda likes heavy drinking:
+No causal relationship between drinking habits and Beer production
+
+## Is there any sober group? geographical reason? economy reason? that I can draw
+
+
+## what is the distribution of CO throughout years? 
+```{r}
+
+```
+
+
+## Styling code
+```{r include = FALSE}
+styler::tidyverse_style()
+```
+
+ 

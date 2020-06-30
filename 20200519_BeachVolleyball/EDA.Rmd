@@ -1,0 +1,295 @@
+---
+title: "EDA"
+author: "Tu"
+date: "6/11/2020"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+windowsFonts(Helvetica = "TT Arial")
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(bbplot)
+theme_set(theme_minimal())
+```
+
+
+```{r warning=FALSE, include=FALSE}
+vb_matches <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-19/vb_matches.csv', guess_max = 76000)
+```
+
+
+## Knwon: serve is a disadvantage because it provides chances for opponent to attack.
+
+```{r}
+#vb_matches %>%
+ # skimr::skim() 
+```
+
+
+
+```{r fig.height=20, fig.width=20}
+vb_tot <- vb_matches %>%
+  transmute(
+    across(circuit:gender),
+    w_attacks = w_p1_tot_attacks + w_p2_tot_attacks,
+    w_kills = w_p1_tot_kills + w_p2_tot_kills,
+    w_errors = w_p1_tot_errors + w_p2_tot_errors,
+    w_aces = w_p1_tot_aces + w_p2_tot_aces,
+    w_serveerrors = w_p1_tot_serve_errors + w_p2_tot_serve_errors,
+    w_blocks = w_p1_tot_blocks + w_p2_tot_blocks,
+    w_digs = w_p1_tot_digs + w_p2_tot_digs,
+    l_attacks = l_p1_tot_attacks + l_p2_tot_attacks,
+    l_kills = l_p1_tot_kills + l_p2_tot_kills,
+    l_errors = l_p1_tot_errors + l_p2_tot_errors,
+    l_aces = l_p1_tot_aces + l_p2_tot_aces,
+    l_serveerrors = l_p1_tot_serve_errors + l_p2_tot_serve_errors,
+    l_blocks = l_p1_tot_blocks + l_p2_tot_blocks,
+    l_digs = l_p1_tot_digs + l_p2_tot_digs
+  )%>%
+  pivot_longer(w_attacks:l_digs,
+               names_to = 'stat',
+               values_to = 'value') %>%
+  separate(col = "stat",
+           into = c("win_lose", "technique"),
+           sep = "_",
+           extra = "merge") 
+
+```
+
+
+
+
+# Hypothesis 1: Winning team should be good at attacking to score
+# Hypothesis 2: Winning team should be good at blocking and digging
+
+## I am going to look at winning teams' behavior, compare to losing teams. 
+
+```{r}
+vb_tot %>%
+  na.omit() %>%
+  # replace_na(list(value = 0)) %>%
+  ggplot(aes(gender, value, color = win_lose, fill = win_lose)) +
+  geom_violin(alpha = 0.4) +
+  facet_wrap(~technique, scales = "free_y") 
+  
+```
+
+Observation 1: Without na.omit() there a ton of missing values.
+
+# i wanna make a table. Variable name: Percentage of missing values.
+
+```{r}
+vb_tot %>%
+  group_by(technique) %>%
+  summarise(pct = mean(is.na(value)),
+            n = n()) 
+```
+Now I am heading to player-level data. See if the score really match with the used techiques per match
+
+
+
+
+```{r}
+vb_tot %>%
+  #filter(win_lose == "w") %>%
+  replace_na(list(value = 0)) %>%
+  group_by(technique, win_lose) %>%
+  summarise(most_tech = sum(value)) %>%
+  arrange(desc(most_tech)) %>%
+  ggplot(aes(technique, most_tech, fill = as.factor(win_lose))) +
+  geom_bar(stat = "identity", position="dodge") +
+  geom_hline(yintercept = 0, size = 1, colour="#333333") +
+  bbc_style() +
+  scale_fill_manual(values = c("#1380A1", "#FAAB18"))
+  
+```
+Less errors.
+Less attacks.
+More digs;
+more blocks;
+more kills
+
+
+# I also wonder the distribution of techniques per match or tournament or country. At those various conditions(gaming country, home country, gender, age), which technique is the most popular?
+
+I am going to dive into player level data and find out!
+
+
+```{r include=FALSE}
+vb_player_match <- 
+  vb_matches %>%
+  # separate the name. (all the names with _ symbol)
+  rename(w_p1_name = w_player1, w_p2_name = w_player2,
+         l_p1_name = l_player1, l_p2_name = l_player2,
+         w_team_rank = w_rank, l_team_rank = l_rank) %>%
+  mutate_at(vars(starts_with('w_'), starts_with('l_')), as.character) %>%
+  pivot_longer(
+    cols = c(starts_with("w_"),starts_with("l_"))) %>%
+  separate(col = "name",
+           into = c("win_lose", "player","stats"),
+           sep = "_",
+           extra = "merge") %>%
+  rename(tournament_country = country) %>%
+ 
+  # dont wanna name and birthdate and age stacked
+  # this might be dangerous...I might sum the dig, kill...of two players
+  pivot_wider(names_from = 'stats', 
+             values_from = 'value',
+             names_repair = 'unique') %>%
+  type_convert() %>%
+  filter(player != "team") %>%
+  
+  #split score
+  separate_rows(score, sep = ",") %>%
+  mutate(score = str_remove(score, ' retired')) %>%
+  mutate(score = na_if(score, "Forfeit or other")) %>%
+  separate(score, c('w_score', 'l_score'), sep = "-")
+  
+
+```
+
+```{r fig.height=15, fig.width=20}
+vb_player_match %>%
+  replace_na(list(tot_digs = 0)) %>%
+ # filter(tot_attacks != 0) %>%
+ # pivot_longer(tot_attacks:tot_digs,
+  #             names_to = 'stat',
+   #            values_to = 'value') %>%
+  ggplot() +
+  geom_density(aes(x = tot_digs, colour = win_lose, fill = win_lose), alpha=0.2) +
+  facet_wrap(~ country, scales = "free", nrow = 10)
+
+```
+
+### It is unreasonable to claim that NAs in total techniques are 0 because a lot of countries(Algeria, Iceland and Nigeria etc..) their data are just not recorded.
+```{r}
+vb_player_match %>%
+  filter(country == 'Algeria') %>%
+  View()
+# algeria technique data is all NA???!!!
+```
+```{r}
+vb_matches %>%
+  filter(l_p2_country == "Algeria") %>%
+  View()
+  
+```
+
+
+```{r}
+vb_player_match %>%
+  replace_na(list(tot_digs = 0)) %>%
+  filter(tot_attacks != 0) %>%
+ # pivot_longer(tot_attacks:tot_digs,
+  #             names_to = 'stat',
+   #            values_to = 'value') %>%
+  ggplot() +
+  geom_density(aes(x = tot_digs, colour = win_lose, fill = win_lose), alpha=0.2) +
+  facet_wrap(~ circuit, scales = "free", nrow = 10)
+```
+
+
+
+## observations before filter(!=0), 
+so many missing values in each country
+some countries dont use attacks???? -> it's just not recorded
+
+## things i wanna find out:
+* players from which country have the highest winning rate
+```{r}
+head(vb_player_match)
+
+```
+
+```{r}
+vb_player_match %>%
+  group_by(country) %>%
+  summarise(win_pct = mean(win_lose == "w")) %>%
+  arrange(desc(win_pct))
+```
+
+Do brazilian players also show up both in AVP and FIVB?
+```{r}
+both_t_country <- vb_player_match %>%
+  group_by(country, circuit) %>%
+  summarise(win_pct = mean(win_lose == "w")) %>%
+  ungroup() %>%
+  pivot_wider(names_from = "circuit",
+              values_from = "win_pct") %>%
+  na.omit() %>%
+  filter(FIVB != 0 & AVP != 0) %>%
+  arrange(desc(AVP))
+```
+```{r fig.height=30}
+both_t_country %>%
+  mutate(country = fct_reorder(country, FIVB)) %>%
+  pivot_longer(cols = FIVB:AVP,
+               names_to = "game",
+               values_to = "winning_rate") %>%
+  ggplot() +
+  geom_bar(aes(winning_rate, country, fill = game),
+           stat = 'identity',
+           position = 'dodge') +
+  scale_fill_brewer()
+               
+```
+```{r }
+library(hrbrthemes)
+update_geom_font_defaults()
+
+p <- both_t_country %>%
+  mutate(diff = round(FIVB - AVP,2),
+         country = fct_reorder(country, diff))
+```
+```{r fig.height=18}
+
+plot <- ggplot(data = p, aes(x = country, y = diff, label=diff)) +
+  geom_segment(aes(x = country, xend = country,
+                   y = 0, yend = diff), 
+               color = "black") +
+  geom_point(stat='identity', fill="black", size=18) +
+  coord_flip() +
+  geom_text(color="white", size=6) +
+ # bbc_style() +
+  theme(
+      panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      legend.position="none"
+    )
+plot
+```
+
+
+Ok, they do.
+Then, 
+* in which country do Brazilian players lose the most? 
+```{r}
+vb_player_match %>%
+  mutate_at(vars(match_num), as.character) %>%
+  filter(country == "Brazil" ) %>%
+  group_by(tournament_country) %>%
+  summarise(
+    win_pct = mean(win_lose == "w")
+    )
+  
+```
+
+* why is there a difference in those two circuits?
+* because they serve more in AVP?
+* rules not favored?
+* which year?
+* do men play worse?
+```{r}
+vb_player_match %>%
+ # mutate_at(vars(match_num), as.character) %>%
+  filter(country == "Brazil" ) %>%
+  group_by(tournament_country) %>%
+  distinct(match_num) %>%
+  arrange(desc(match_num))
+  
+```
+
