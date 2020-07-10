@@ -18,7 +18,9 @@ theme_set(theme_minimal())
 
 
 ```{r warning=FALSE, include=FALSE}
-vb_matches <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-19/vb_matches.csv', guess_max = 76000)
+vb_matches <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-19/vb_matches.csv', guess_max = 76000) 
+  # %>%
+  # filter(w_p1_country == w_p2_country | l_p1_country == l_p2_country)
 ```
 
 
@@ -214,15 +216,16 @@ vb_player_match %>%
 
 Do brazilian players also show up both in AVP and FIVB?
 ```{r}
-both_t_country <- vb_player_match %>%
+#both_t_country <- 
+  vb_player_match %>%
   group_by(country, circuit) %>%
   summarise(win_pct = mean(win_lose == "w")) %>%
   ungroup() %>%
   pivot_wider(names_from = "circuit",
               values_from = "win_pct") %>%
   na.omit() %>%
-  filter(FIVB != 0 & AVP != 0) %>%
-  arrange(desc(AVP))
+ # filter(FIVB != 0 & AVP != 0) %>%
+  arrange(desc(FIVB))
 ```
 ```{r fig.height=30}
 both_t_country %>%
@@ -292,4 +295,60 @@ vb_player_match %>%
   arrange(desc(match_num))
   
 ```
+So countries with 0 winning percent actually do not win
+```{r}
+vb_player_match %>%
+  filter(country == "Fiji" & circuit == "FIVB")
+```
 
+
+## Height? does FIVB and AVP winning rate have anything to do with player's height from each country?
+* replace height na with average height of each country
+```{r}
+height <- vb_player_match %>%
+  group_by(country) %>%
+  summarise(avg_height = mean(hgt, na.rm = TRUE)) %>%
+  ungroup() 
+  
+win_pct <- vb_player_match %>%
+  group_by(country, circuit) %>%
+  summarise(win_pct = mean(win_lose == "w"),
+           ) %>%
+  ungroup() %>%
+  pivot_wider(names_from = "circuit",
+              values_from = "win_pct") %>%
+  na.omit()
+
+data <- left_join(win_pct, height)
+```
+
+
+
+```{r fig.height=10, fig.width=15}
+data %>%
+    pivot_longer(cols = FIVB:AVP,
+               names_to = "game",
+               values_to = "winning_rate") %>%
+  
+  ggplot(aes(avg_height, winning_rate, colour = game)) +
+  geom_point() +
+  geom_line() +
+  geom_text(aes(label = country), check_overlap = TRUE)
+```
+
+What is going on with 
+```{r}
+vb_player_match %>% 
+  filter(country == "Russia" | country == "Moldova") %>% 
+  count(country)
+```
+
+em...Russia is a very experienced country...number of matching games should account for difference of average winning percent
+
+* add a column to data that includes number of total games for each country
+```{r}
+vb_matches %>%
+  count(bracket)
+```
+
+## If USA matches with another USA team, one wins and the other one loses. Then the winning rate of USA becomes 50%. Therefore, winning rate is not a good abstract of information

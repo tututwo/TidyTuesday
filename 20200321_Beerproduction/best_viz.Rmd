@@ -189,6 +189,52 @@ df_brew %>%
     #(x = NULL, y = NULL)
 
 
+```{r fig.height=6, fig.width=12}
+beer_geo %>%
+  # why only 1,1 works??????????????????????????????????
+  # without initial x and y, the axis are missing
+  ggplot(aes(1, 1)) +
+  geom_point(aes(colour = national_level, size = alcoholic_percent)) +
+  # states that drink less than national_level
+  geom_richtext(
+    data = filter(beer_geo, national_level == "non_alcoholic"),
+    aes(label = label, vjust = vjust), # ????????????????????????
+    colour = "white",
+    fill = NA,
+    label.color = NA
+  ) +
+  # states that drink less than national_level
+  geom_richtext( # unlike geom_text, geom_richtext can create markdown label, which means more special operations
+    data = filter(beer_geo, national_level == "alcoholic"),
+    aes(label = label, vjust = vjust),
+    color = "white", # determines color of label text and label outline.
+    fill = NA, # Default fill color of label background is white, nullifying it makes the yellow come outs
+    label.colour = NA # overrides color, so the label outline disappears
+  ) +
+  # title?
+  geom_richtext(
+    data = beer_geo %>% filter(state == "MI"),
+    aes(label = title),
+
+    color = "red",
+    size = 6,
+    lineheight = .9,
+    fill = NA,
+    label.color = NA,
+    hjust = 0,
+    vjust = 1
+  ) +
+  facet_geo(vars(state), grid = "us_state_grid2", label = "code") +
+  scale_color_manual(
+    values = c("grey70", "#f2ad22"),
+    guide = F
+  ) +
+  scale_size(
+    range = c(10, 20),
+    guide = F
+  ) +
+  coord_cartesian(clip = "off") +
+  theme(strip.text = element_blank())
 ```
 ```{r}
 
@@ -201,6 +247,11 @@ pdftools::pdf_convert(here::here("plots", "2020_14", "2020_14_BeerProduction.pdf
 
 ***
 
-```{r session-info}
-sessionInfo()
+
+```{r}
+p <- ggplot(tips, aes(x=total_bill, y=tip/total_bill)) + geom_point(shape=1)
+
+# Divide by day, going horizontally and wrapping with 2 columns
+p <- p + facet_wrap( ~ day, ncol=2)
 ```
+

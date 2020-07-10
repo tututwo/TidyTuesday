@@ -1,0 +1,56 @@
+---
+title: "data_clean_all_beverage"
+author: "Tu"
+date: "7/7/2020"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(openintro)
+```
+
+```{r}
+all_beverage <- read_csv("20200321_Beerproduction/all_beverage.csv")
+states_names <- read_csv("20200321_Beerproduction/states_names.csv")
+```
+
+
+```{r}
+stateBeer_2018 <- all_beverage %>% 
+  left_join(states_names, by = "Geo_id") %>% 
+  filter(Beverage_type == 3 & Year == 2018 & 
+        !states %in% c("Northeast Region", "Midwest Region", "South Region", "West Region", "United States")) %>% 
+  transmute(year = as.numeric(Year),
+            state = state2abbr(states),
+            adults_pop = Population_above21,
+            consume_per_capita = Gallons_ethanol_per_capita_above_21/1000)
+```
+```{r}
+beer_states <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-31/beer_states.csv') %>% 
+  na.omit()
+```
+
+
+
+```{r}
+beer <- beer_states %>% 
+  filter(year == 2018) %>% 
+  group_by(state) %>% 
+  summarise(production_sum = sum(barrels * 31)) %>% 
+  ungroup() %>% 
+  left_join(stateBeer_2018, by = "state") %>% 
+  na.omit() %>% 
+  mutate(needed_people = ceiling(production_sum/consume_per_capita),
+         alcoholic_percent = needed_people/adults_pop * 100,
+         # sum(beer$needed_people)/sum(beer$adults_pop) * 100 = 0.1791002
+         everyone_drink = if_else(alcoholic_percent > 100, "YES", "NO"))
+         
+ # select(state, alcoholic_percent, national_level) 
+```
+```{r}
+write.csv(beer,"C:/Github/TidyTuesday/20200321_Beerproduction/beer.csv", row.names = FALSE)
+```
+
+
+

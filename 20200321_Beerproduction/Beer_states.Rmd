@@ -5,78 +5,206 @@ date: "6/22/2020"
 output: html_document
 ---
 
-```{r}
+```{r include=FALSE}
 library(tidyverse)
-library(bbplot)
-library(lubridate)
-theme_set(theme_minimal())
+library(geofacet)
+library(ggtext)
+library(showtext)
+
+font_add_google("Indie Flower", "Indie Flower")
+theme_set(theme_void(base_family = "Indie Flower", base_size = 15, colour = "#7A3803"))
+showtext_auto()
+```
+```{r}
+beer_plot <- beer %>%
+  mutate(
+    people_drink = consume_per_capita * adults_pop,
+    deficiency = if_else((people_drink - production_sum) > 0, people_drink - production_sum, 0)
+  ) %>%
+  pivot_longer(
+    cols = c(deficiency, production_sum),
+    names_to = "type",
+    values_to = "amount"
+  ) %>%
+  mutate(
+    uniform_col = "THIS",
+    type = factor(type, levels = c("deficiency", "production_sum"))
+  )
 ```
 
 ```{r}
-beer_states <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-31/beer_states.csv') %>%
-  na.omit()
-```
-```{r}
-write.csv(beer_states,".\\beer_states.csv", row.names = FALSE)
+set.seed(222)
+beer_dot <- beer %>%
+  mutate(
+    people_drink = consume_per_capita * adults_pop,
+    deficiency = people_drink - production_sum
+  ) %>%
+  group_by(state) %>%
+  slice(rep(1, each = floor(consume_per_capita))) %>%
+  transmute(
+    state = factor(state),
+    uniform_col = "THIS",
+    dots_brewer = runif(floor(consume_per_capita),
+      min = if_else(production_sum > people_drink, people_drink * 0.1, production_sum * 0.1),
+      max = if_else(production_sum < people_drink, people_drink * 0.9, production_sum * 0.9)
+    ),
+    dot_size = runif(floor(consume_per_capita), 0, 1)
+  ) %>%
+  ungroup()
 ```
 
+## America
 ```{r}
-skimr::skim(beer_states)
+US <- beer %>%
+  transmute(
+    US_prodution = sum(production_sum),
+    overflow = sum(production_sum) - sum(consume_per_capita * adults_pop)
+  ) %>%
+  pivot_longer(
+    cols = c(overflow, US_prodution),
+    names_to = "type",
+    values_to = "amount"
+  ) %>%
+  mutate(
+    uniform_col = "THIS",
+    type = factor(type, levels = c("overflow", "US_prodution"))
+  ) %>%
+  distinct()
+
+US_dot <- US %>%
+  slice(rep(1, each = 12)) %>%
+  mutate(
+    dots_brewer = runif(12,
+      min = 2330310745 * 0.1,
+      max = 5173564192 * 0.9
+    ),
+    dot_size = runif(12, 0, 1)
+  )
 ```
 
-```{r}
-head(beer_states)
-```
-
-## What is the most common/produced type throughout the years?
-```{r}
-beer_states %>%
-  count(type)
-```
- 
-```{r}
-beer_states %>%
-  group_by(type) %>%
-  tally(barrels)
-```
- 
- ## Where is this difference from? Which state produces the most of bottles of cans?
- ## Which year is the boost?
- 
-```{r fig.height=22, fig.width=11}
-beer_states %>%
-  filter(!str_detect(state, "total")) %>%
-  group_by(state,type) %>%
-  tally(barrels) %>%
-  arrange(desc(n)) %>%
+```{r fig.height=3, fig.width=3}
+# US_p <-
+US %>%
   ggplot() +
-  geom_col(aes(x = n, y = reorder(state,n), fill = type))
+  geom_chicklet(aes(x = uniform_col, y = amount, fill = fct_rev(type))) +
+  scale_fill_manual(values = c("#F2CF77", "#c96e12")) +
+  geom_jitter(
+    data = US_dot,
+    aes(uniform_col, dots_brewer, size = dot_size),
+    position = position_jitter(width = 0.5, height = 0.22, seed = 3),
+    shape = 21,
+    color = colorspace::darken("#f9e556", .45),
+    stroke = .3,
+    # colorspace::darken("#f9e556", .45)
+    alpha = 0.5
+  ) +
+  theme(legend.position = "none")
 ```
- 
- 
 
-```{r fig.height=22, fig.width=11}
-beer_states %>%
-  filter(state == "ND") %>%
-    group_by(type) %>%
-    tally(barrels) 
+
+
+## geom_col
+```{r fig.height=13.5, fig.width=22}
+p <-
+  beer_plot %>%
+  full_join(us_state_grid2, by = c("state" = "code")) %>%
+  ggplot() +
+  geom_chicklet(aes(x = uniform_col, y = amount, fill = fct_rev(type))) +
+  scale_fill_manual(values = c("#F2CF77", "white")) +
+  # f4d380/F2CF77
+  # bubbles
+  geom_jitter(
+    data = beer_dot,
+    aes(uniform_col, dots_brewer, size = dot_size),
+    position = position_jitter(width = 0.5, height = 0.3, seed = 2),
+    shape = 21,
+    color = colorspace::darken("#f9e556", .45),
+    stroke = .3,
+    # colorspace::darken("#f9e556", .45)
+    alpha = 0.6
+  ) +
+  geom_text(
+    data = beer_plot,
+    mapping = aes(x = 0.6, y = -Inf, label = state),
+    family = "Indie Flower",
+    hjust = 0.01,
+    vjust = -1,
+    colour = "#1C1259",
+    fontface = "bold",
+    size = 8
+  ) +
+  facet_geo(vars(state), grid = "us_state_grid2", scales = "free_y") +
+  labs(
+    title = "How much <span style='color:white'>beer would be needed</span> if legal drinkers in each state <br>were only allowed to drink <span style='color:#F2CF77'>local beer</span> in 2018?",
+    subtitle = "Only 1/3 states' <span style='color:#F2CF77'>total beer production</span> in 2018 can fulfill the local beer crave, but US in total produces more than 30% more <br> beer than US adult citizens drink in 2018.<br><span font-size:15em> Yellow bar is the <span style='color:#F2CF77'>total beer production</span>in that state, and the white bar is the <span style='color:white'>beer in demand</span>.<br>Number of bubbles represents the number of gallons consumed per person in each states. </span>",
+    caption = "Source:Datafrom the Alcohol and Tobacco Tax and Trade Bureau (TTB) and National Institute on Alcohol Abuse and Alcoholism (NIAA)"
+    # https://pubs.niaaa.nih.gov/publications/surveillance115/pcyr1970-2018.txt"
+  ) +
+  theme(
+    plot.background = element_rect(fill = "#48a4d6"),
+    # 1C1259
+    legend.position = "none",
+
+
+    plot.title = element_markdown(
+      face = "bold",
+      size = rel(2.8),
+      color = "#1C1259",
+      hjust = 0.02,
+      margin = margin(t = 6, b = 7)
+    ),
+    plot.subtitle = element_markdown(
+      size = rel(1.6),
+      color = "#1C1259",
+      # hjust = 0.06,
+      margin = margin(t = 5, b = 3)
+    ),
+    plot.caption = element_text(
+      face = "italic",
+      # size = rel(1.1),
+      color = "#1C1259",
+      hjust = 0.47
+    ),
+    strip.text = element_blank()
+  ) +
+  coord_cartesian(clip = "off")
+```
+## geom_rect
+```{r fig.height=12, fig.width=18}
+beer %>%
+  # mutate(state = factor(state)) %>%
+  full_join(us_state_grid2, by = c("state" = "code")) %>%
+  ggplot() +
+  geom_rect(aes(xmin = state, xmax = production_sum / 10e7, ymin = 0, ymax = people_drink), fill = "#EBE1CE") +
+  geom_rect(aes(xmin = state, xmax = production_sum / 10e7, ymin = 0, ymax = production_sum), fill = "#f9e556") +
+
+  # bubbles
+  geom_jitter(
+    data = beer_dot,
+    aes(state, dots_brewer, size = dot_size),
+    position = position_jitter(width = 0.7),
+    shape = 21,
+    color = colorspace::darken("#f9e556", .17),
+    stroke = .3,
+  ) +
+  facet_geo(vars(state), grid = "us_state_grid2", label = "code", scales = "free_y") +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "#1C1259"),
+    strip.text = element_text(hjust = 0.3, vjust = 0.8),
+    legend.position = "none",
+    plot.caption = element_text(face = "italic")
+  ) +
+  labs(
+    subtitle = "North Dakota and South Dakota need the least number of people to consume their local beer.",
+    caption = "Source: 
+    Data is downloaded from NIAA   https://pubs.niaaa.nih.gov/publications/surveillance115/pcyr1970-2018.txt"
+  )
 ```
 
-## I wonder what happen to those low production states?(SD,ND,WV) geographical reasons? climate? but people in Dokoda likes heavy drinking:
-No causal relationship between drinking habits and Beer production
 
-## Is there any sober group? geographical reason? economy reason? that I can draw
-
-
-## what is the distribution of CO throughout years? 
 ```{r}
-
+ggsave("p.pdf", p,
+  width = 22, height = 13.5, units = "in", device = cairo_pdf
+)
 ```
-
-
-## Styling code
-```{r include = FALSE}
-styler::tidyverse_style()
-```
-
- 
