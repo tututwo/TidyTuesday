@@ -1,0 +1,148 @@
+---
+title: "Untitled"
+author: "tu"
+date: "8/21/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(showtext)
+library(ragg)
+library(ggtext)
+library(lubridate)
+library(emojifont)
+font_add_google("Anton", "Anton")
+
+theme_set(theme_void(base_family = "Anton"))
+data <- tidytuesdayR::tt_load(2020, week = 18)
+```
+# how much money has each show accmulated before they actually won a prize
+```{r}
+vis_data <- 
+data$grosses %>% 
+  anti_join(data$`pre-1985-starts`) %>% 
+  right_join(tony, by = c("show" = "Best Musical")) %>% 
+  mutate(Date = mdy(Date),
+         show = as.factor(show),
+         period = Date - week_ending) %>% 
+  filter(week_ending < Date) %>% 
+  group_by(show,Date) %>% 
+  summarise(gross_before_award = sum(weekly_gross),
+            days_before_award = sum(period)) %>% 
+  ungroup() 
+```
+
+
+
+```{r}
+tri <- 
+vis_data %>% 
+  arrange(desc(gross_before_award)) %>% 
+ # pull(gross_before_award) %>% 
+  mutate(id = row_number()) %>% 
+  select(-Date) %>% 
+  group_by(show) %>%
+  mutate(
+    arrow_x = list(c(id - 0.25, id, id + 0.25)),
+    arrow_y = list(c(0,gross_before_award,0))
+  )  %>% 
+  unnest(c(arrow_x, arrow_y))
+```
+
+```{r}
+df_annotate <- 
+vis_data %>% 
+  arrange(desc(gross_before_award)) %>% 
+ # pull(gross_before_award) %>% 
+  transmute(
+    x = row_number()+1,
+    year = year(Date),
+    gross = scales::dollar(gross_before_award),
+    days = days_before_award,
+    y = sort(seq(2910024, 75997992, (75997992-2910024)/30), decreasing = TRUE),
+    show, 
+    label = glue::glue('<b style="color:#F3DF6F; font-size:25px">{show}</b><br><b style="color:#A92B49; font-size:18px">{gross} -- {year}</b><br><b style = "color:#B1B1B1; font-size:14px">{days}days after debut</b>'),
+    gross_before_award 
+    )
+  
+```
+```{r fig.height=25, fig.width=25}
+# <- 
+vis_data %>% 
+  ggplot(
+    aes(
+      reorder(show, desc(gross_before_award)),
+      gross_before_award
+    )
+  ) +
+  geom_text(
+    aes(
+      size = as.numeric(days_before_award)
+    ),
+    family = "fontawesome-webfont",
+    label = fontawesome('fa-star'),
+    vjust = 0.05,
+    color = "#F3DF6F"
+  ) +
+  scale_size(range = c(5, 15))+
+  geom_polygon(
+    data = tri,
+    aes(
+      arrow_x,
+      arrow_y,
+      group = show
+    ),
+    fill = "#A92B49"
+  ) +
+  geom_richtext(
+    data = df_annotate,
+    aes(
+      x-0.999,
+      y + 1500000,
+      label = label
+      ),
+    angle = 0,
+    vjust = 0,
+    hjust = 0,
+    fill = NA, 
+    label.color = NA
+    ) +
+  expand_limits(x=c(0,37)) + 
+  geom_segment(data = df_annotate,
+    aes(
+      y = gross_before_award + 1800000,
+      x = x-1,
+      xend = x-1,
+      yend = y + 1800000
+      ),
+    color = "grey35",
+    size = 1,
+    linetype = "dotted"
+    ) +
+  # labs(
+  #   caption = '<span style = "color:#B1B1B1">Visualization by Yukun Tu(Gordon)  •  Data via Playbill and Wikipedia</span>'
+  #   ) +
+  theme_void()+
+  theme(
+    legend.position = "none",
+    plot.background = element_rect(fill = "#101420"),
+    panel.grid = element_blank(),
+    plot.title = element_markdown(),
+    plot.subtitle = element_markdown(),
+    plot.caption = element_markdown()
+    )
+
+ggsave(here::here("20200428_Broadway", "20200428_Broadway.pdf"),
+       width = 25, height = 25, device = cairo_pdf)
+# pdftools::pdf_convert(here::here("20200428_Broadway", "20200428_Broadway", "20200428_Broadway.pdf"),
+#                       format = "png", dpi = 500)
+```
+
+
+

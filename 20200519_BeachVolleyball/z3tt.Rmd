@@ -109,7 +109,25 @@ df_volley_geo <-
   filter(code_alpha3 != "ATA")
 ```
 
-```{r plot, fig.height=, fig.width=17, warning=FALSE}
+```{r plot, fig.height=20, fig.width=17, warning=FALSE}
+df_volley_geo %>% 
+  ggplot(aes(1, 1)) +
+    ## countries that played matches
+    geom_point(
+      aes(
+        color = col,
+        size = matches
+      )
+    ) +
+      geofacet::facet_geo(
+      ~country, 
+      grid = "world_countries_grid1", 
+      label = "code_alpha3"
+    )
+```
+
+
+```{r plot, fig.height=20, fig.width=17, warning=FALSE}
 
   df_volley_geo %>% 
   ggplot(aes(1, 1)) +
@@ -208,15 +226,4 @@ df_volley_geo <-
 ```{r session}
 sessionInfo()
 ```
-© 2020 GitHub, Inc.
-Terms
-Privacy
-Security
-Status
-Help
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
+

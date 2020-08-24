@@ -1,0 +1,112 @@
+---
+title: "highcharts"
+author: "tu"
+date: "7/27/2020"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(gapminder)
+library(highcharter)
+library(lubridate)
+data(gapminder, package = "gapminder")
+
+gapminder2007 <- gapminder %>% 
+  filter(year == max(year)) %>% 
+  select(-year) %>% 
+  mutate(pop = pop/1e6) %>% 
+  arrange(desc(pop))
+
+gapminder_column <- gapminder2007 %>%
+  group_by(continent) %>% 
+  summarise(
+    lifeExp = weighted.mean(lifeExp, pop),
+    gdpPercap = weighted.mean(gdpPercap, pop),
+    pop = sum(pop)
+  ) %>% 
+  mutate_if(is.numeric, round) %>% 
+  arrange(desc(pop)) %>% 
+  mutate(continent = fct_inorder(continent))
+
+gapminder_column
+```
+
+
+```{r}
+gapminder_drilldown <- gapminder2007 %>% 
+  group_nest(continent) %>% 
+  mutate(
+    id = continent,
+    type = "column",
+    # in the drilldown we'll give the mapping via creating the columns
+    data = map(data, mutate, name = country, y  = pop),
+    data = map(data, list_parse)
+  )
+
+gapminder_drilldown
+```
+
+```{r}
+x <- c("Population (MM)", "Life expectancy at birth", "GDP per capita (US$)")
+y <- c("{point.pop}", "{point.lifeExp}", "$ {point.gdpPercap}")
+
+tt <- tooltip_table(x, y)
+
+hchart(
+  gapminder_column,
+  "treemap",
+  hcaes(x = factor(continent), value = as.numeric(pop), color = pop, name = continent, drilldown = continent),
+  name = "Population",
+)  %>%
+  hc_drilldown(
+    allowPointDrilldown = TRUE,
+    series = list_parse(gapminder_drilldown)
+  )
+
+```
+
+```{r fig.height=15, fig.width=20}
+grosses_1st <- 
+  grosses %>% 
+  inner_join(tony_award) %>% 
+  group_by(show,) %>% 
+  summarise(gross = sum(weekly_gross)) 
+
+grosses_2nd <- 
+grosses %>% 
+  inner_join(tony_award) %>% 
+  mutate(year = year(date(week_ending)),
+         available_seats = seats_sold * (1 - pct_capacity)) %>% 
+  group_by(show, year, week_number) %>% 
+  summarise(seats = sum(available_seats)) %>% 
+  mutate(seat_for_you = if_else(seats > 0, "YES", "NO")) %>% 
+  ungroup()
+
+```
+```{r}
+#grosses_drilldown <- 
+grosses_2nd %>% 
+  group_nest(show) %>% 
+  mutate(
+    id = show,
+    type = "column",
+    # in the drilldown we'll give the mapping via creating the columns
+    data = map(data, mutate, name = show, y  = seats),
+    data = map(data, list_parse)
+  )
+```
+
+
+```{r}
+hchart(
+  grosses_1st,
+  "treemap",
+  hcaes(x = factor(show), value = as.numeric(gross), color = gross,name = show, drilldown = show),
+  name = "gross",
+) %>% 
+  
+
+```
+
+
