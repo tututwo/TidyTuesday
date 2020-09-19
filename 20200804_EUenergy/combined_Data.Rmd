@@ -1,0 +1,166 @@
+---
+title: "Untitled"
+author: "tu"
+date: "8/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggimage)
+library(geofacet)
+theme_set(theme_minimal())
+
+tuesdata <- tidytuesdayR::tt_load(2020, week = 32)
+
+type <- tuesdata$energy_types %>% filter(level == "Level 1")
+total <- tuesdata$country_totals
+```
+```{r fig.height=10, fig.width=16}
+#two_data <- 
+total %>% 
+  pivot_longer(
+    cols = starts_with("20"),
+    names_to = "year_usage",
+    values_to = "energy_usage"
+  ) %>% 
+  replace_na(list(country_name = "United Kingdom")) %>% 
+  group_by(country, country_name, type) %>% 
+  summarise(energy_usage = sum(energy_usage)) %>% 
+  full_join(prep) %>% 
+  ungroup() %>% 
+  filter(type %in%  c("Energy supplied","Exports")) %>% 
+  pivot_wider(
+    names_from = type,
+    values_from = energy_usage
+  ) %>% 
+  mutate(
+    unfulfilled = -(New_tech-`Energy supplied`)/`Energy supplied`
+  ) %>% 
+  ggplot(aes(reorder(country_name, unfulfilled),unfulfilled))+
+  geom_col()+
+  coord_flip()
+  # geom_text(aes(label = country))
+```
+```{r}
+total %>% 
+  pivot_longer(
+    cols = starts_with("20"),
+    names_to = "year_usage",
+    values_to = "energy_usage"
+  ) %>% 
+  replace_na(list(country_name = "United Kingdom")) %>% 
+  group_by(country, country_name, type) %>% 
+  summarise(energy_usage = sum(energy_usage)) %>% 
+  full_join(prep) %>% 
+  ungroup() %>% 
+  filter(country == "NO")
+  
+```
+
+
+```{r}
+#emis_data <- 
+annual_co2_emissions_per_country %>% 
+  filter(Year %in% c(2016, 2017, 2018)) %>% 
+  group_by(Entity) %>% 
+  summarise(emission = sum(`Annual CO₂ emissions (tonnes)`)) %>% 
+  right_join(two_data , by = c("Entity" = "country_name")) %>% 
+  left_join(co_emissions_per_capita %>% 
+              filter(Year %in% c(2016, 2017, 2018)) %>% 
+              pivot_wider(
+                    names_from = Year,
+                    values_from = `Per capita CO₂ emissions (tonnes)`
+              )
+            ) %>% 
+  ggplot()+
+  geom_col(aes(
+    
+  ))
+  
+```
+
+```{r}
+emis_data %>% 
+  ggplot(
+    aes(
+      decarb_pct,
+      `2018`,
+      color = color
+    )
+  ) +
+  geom_point() 
+  # geom_text(
+  #   aes(
+  #     label = Entity
+  #   )
+  # )
+```
+
+# how decarb_pct and imports pct correlated?
+more decarb more import
+```{r fig.height=10, fig.width=10}
+emis_data %>% 
+  #filter(color == "cov") %>% 
+  pivot_wider(
+    names_from = type,
+    values_from = energy_usage
+  ) %>% 
+  # mutate(
+  #   ex = Exports/(`Total net production` + Exports)
+  # ) %>% 
+  ggplot(
+    aes(
+      decarb_pct*100,
+      `2018`,
+      color = color
+    )
+  ) +
+  geom_point(
+    
+  ) +
+  geom_text(
+    aes(
+      label = Entity
+    )
+  )
+  # ylim(0,0.5) +
+  # xlim(0, 1)
+```
+
+# 主要想探知对新旧能源得生产是否和能量的去处/用途有什么关系
+increasing the share of low-carbon energy sources, particularly renewables, and a corresponding reduction in the use of fossil fuels
+
+CO2
+ emissions in the power sector were unchanged in 2017, and rose economy-wide. Low hydro and
+nuclear generation coupled with increasing demand led to increasing fossil generation. So despite
+the large rise in wind generation, we estimate power sector CO2
+ emissions remained unchanged at
+1019 million tonnes. However, overall stationary emissions in the EU emissions trading sectors rose
+slightly from 1750 to 1755 million tonnes because of stronger industrial production especially in rising
+steel production. Together with additional increases in non-ETS gas and oil demand, we estimate
+overall EU greenhouse gas emissions rose by around 1% in 2017. 
+
+## 是不是越decarbonised 就越独立，Imports越少
+
+```{r}
+flag_data <- data.frame(
+  image = c("PT", "ES"),
+  x = c(110, 110),
+  y = c(19.1, 50.1)
+)
+
+## ggplot2 code ##
+ggplot()+
+geom_flag(data = flag_data,
+          aes(x = x, y = y,
+              image = image), size= 0.2
+          )  
+## ggplot2 code ##
+```
+

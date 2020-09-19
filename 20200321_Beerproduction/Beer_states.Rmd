@@ -10,9 +10,10 @@ library(tidyverse)
 library(geofacet)
 library(ggtext)
 library(showtext)
+library(ggchicklet)
 
 font_add_google("Indie Flower", "Indie Flower")
-theme_set(theme_void(base_family = "Indie Flower", base_size = 15, colour = "#7A3803"))
+theme_set(theme_void(base_family = "Indie Flower", base_size = 15))
 showtext_auto()
 ```
 ```{r}
@@ -105,10 +106,10 @@ US %>%
 
 ## geom_col
 ```{r fig.height=13.5, fig.width=22}
-p <-
+#p <-
   beer_plot %>%
   full_join(us_state_grid2, by = c("state" = "code")) %>%
-  ggplot() +
+  ggplot(aes(1000, 1000)) +
   geom_chicklet(aes(x = uniform_col, y = amount, fill = fct_rev(type))) +
   scale_fill_manual(values = c("#F2CF77", "white")) +
   # f4d380/F2CF77
@@ -145,7 +146,7 @@ p <-
     # 1C1259
     legend.position = "none",
 
-
+  
     plot.title = element_markdown(
       face = "bold",
       size = rel(2.8),

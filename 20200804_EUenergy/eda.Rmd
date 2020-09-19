@@ -1,0 +1,104 @@
+---
+title: "Untitled"
+author: "tu"
+date: "8/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggimage)
+library(geofacet)
+theme_set(theme_minimal())
+
+tuesdata <- tidytuesdayR::tt_load(2020, week = 32)
+
+type <- tuesdata$energy_types %>% filter(level == "Level 1")
+#total <- tuesdata$country_totals
+```
+
+
+# How much do new tech power take up the total power produciton
+```{r}
+prep
+
+```
+```{r}
+prep<- 
+type %>% 
+  pivot_longer(
+    cols = starts_with("20"),
+    names_to = "year",
+    values_to = "energy"
+  ) %>% 
+  replace_na(list(country_name = "United Kingdom")) %>% 
+  mutate(
+    year = as.integer(year),
+    convention = if_else(type == "Conventional thermal", "Convention", "New_tech")
+    ) %>% 
+  #filter(country_name != "Albania") %>% 
+  group_by(country_name, convention) %>% 
+  summarise(total_energy = sum(energy)) %>% 
+  pivot_wider(
+    names_from = convention,
+    values_from = total_energy
+  ) %>% 
+  mutate(
+    #new_power_ratio = New_tech/Convention,
+    color = if_else(New_tech/Convention < 1, "cov", "new"),
+    decarb_pct = New_tech/(New_tech + Convention)
+  ) %>% 
+  ungroup()
+
+
+```
+
+```{r fig.height=10, fig.width=15}
+prep %>% 
+  #filter(country_name == "France") %>% 
+  ggplot(aes(1,1))+
+  geom_point(
+      aes(
+        color = color,
+        size = decarb_pct
+      )
+    ) +
+    ggtext::geom_richtext(
+      aes(
+        label = country_name,
+        #vjust = vjust
+      ),
+      family = "Alcubierre",
+      color = "white",
+      fill = NA,
+      label.color = NA
+    ) +
+  geofacet::facet_geo(
+      ~country_name, 
+      grid = "europe_countries_grid2", 
+      label = "country_name"
+    ) +
+    scale_x_continuous(
+      expand = c(0, 0), 
+      limits = c(.99, 1.01)
+    ) +
+    scale_y_continuous(
+      expand = c(0, 0), 
+      limits = c(.99, 1.01)
+    ) +
+    scale_color_manual(
+      values = c("grey20", "#f3c921"),
+      guide = F
+    ) +
+    scale_size(
+      range = c(4, 18), 
+      guide = F
+    ) +
+  theme_void()+
+    coord_cartesian(clip = "off")
+```
+

@@ -1,0 +1,172 @@
+---
+title: "submit"
+author: "tu"
+date: "8/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(ggimage)
+library(tidyverse)
+library(tidytuesdayR)
+library(geofacet)
+library(cowplot)
+
+theme_set(theme_minimal())
+
+tuesdata <- tidytuesdayR::tt_load(2020, week = 32)
+
+type <- tuesdata$energy_types %>% filter(level == "Level 1")
+total <- tuesdata$country_totals
+
+```
+
+```{r}
+vis_data <- 
+type %>% 
+  pivot_longer(
+    cols = starts_with("20"),
+    names_to = "year",
+    values_to = "energy"
+  ) %>% 
+  #replace_na(list(country_name = "United Kingdom")) %>% 
+  mutate(
+    year = as.integer(year),
+    convention = if_else(type == "Conventional thermal", "Convention", "Modern")
+    ) %>% 
+  filter(year == 2018) %>% 
+  group_by(country_name, convention) %>% 
+  summarise(total_energy = sum(energy)) %>% 
+  pivot_wider(
+    names_from = convention,
+    values_from = total_energy
+  ) %>% 
+  mutate(
+    decarb_pct = Modern/(Modern + Convention)
+  ) %>% 
+  ungroup() %>% 
+  full_join(total %>% 
+              pivot_longer(
+                cols = starts_with("20"),
+                names_to = "year_usage",
+                values_to = "energy_usage"
+              ) %>% 
+               
+              filter(
+                year_usage == 2018 & type == "Energy supplied"
+              )
+  ) %>% 
+  replace_na(list(country_name = "United Kingdom")) %>% 
+  mutate(
+    country_name = case_when(
+      country_name == "Bosnia & Herzegovina" ~ "Bosnia and Herzegovina",
+      country_name == "Czechia" ~ "Czech Republic",
+      TRUE ~ as.character(country_name)
+    )
+  ) %>% 
+  left_join(
+    co_emissions_per_capita %>% filter(Year == 2018),
+    by = c("country_name" = "Entity")
+  ) %>%
+  transmute(
+    country_name, decarb_pct,
+    co2_capita = `Per capita CO2 emissions (tonnes)`,
+    unfulfilled_pct = (energy_usage-Modern)/energy_usage,
+    unfulfilled = if_else(unfulfilled_pct > 0 , "YES", "NO"),
+    countrycode = countrycode::countrycode(country_name, origin = 'country.name', destination = 'iso2c')
+
+  )
+
+
+```
+```{r}
+vis_data
+```
+
+```{r fig.height=10, fig.width=12}
+#p <- 
+  vis_data %>% 
+  filter(!is.na(co2_capita)) %>% 
+  ggplot(
+    aes(
+      x = decarb_pct,
+      y = co2_capita,
+    )
+  )+
+  geom_flag(
+    aes(
+      image = countrycode
+      ),
+    size = 0.02
+  ) +
+  geom_text(
+    aes(
+      label = country_name
+    )
+  )
+
+```
+
+```{r}
+#inset <- 
+vis_data %>% 
+  ggplot(aes(1,1))+
+  geom_point(
+      aes(
+        color = unfulfilled,
+        size = unfulfilled_pct
+      )
+    ) +
+    ggtext::geom_richtext(
+      aes(
+        label = countrycode
+      ),
+      color = "white",
+      fill = NA,
+      label.color = NA
+    ) +
+  geofacet::facet_geo(
+      ~country_name, 
+      grid = "europe_countries_grid2", 
+      label = "country_name"
+    ) +
+    scale_x_continuous(
+      expand = c(0, 0), 
+      limits = c(.99, 1.01)
+    ) +
+    scale_y_continuous(
+      expand = c(0, 0), 
+      limits = c(.99, 1.01)
+    ) +
+    scale_color_manual(
+      values = c("grey20", "#f3c921"),
+      guide = F
+    ) +
+    scale_size(
+      range = c(4, 18), 
+      guide = F
+    ) +
+  theme_void()+
+  coord_cartesian(clip = "off") +
+  theme(
+    strip.text = element_blank()
+  )
+```
+```{r fig.height=15, fig.width=15}
+
+ggdraw(p +
+          theme(plot.background = element_rect(fill = "#101420"))) +
+  draw_plot(inset, .45, .45, .5, .5) +
+  draw_plot_label(
+    #c("A", "B"),
+    c(0, 0.5),
+    c(1, 0.95),
+    size = 12
+  )
+```
+
+
